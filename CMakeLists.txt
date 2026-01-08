@@ -3,9 +3,11 @@ project(EchoEngine)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(EchoEngine scr/main.cpp
-        scr/MainFunctional/KEYLOGGER/keylogger.cpp
-        scr/MainFunctional/KEYLOGGER/keylogger.h
-        scr/MainFunctional/KEYLOGGER/main_keylogger.cpp
-        scr/MainFunctional/KEYLOGGER/main_keylogger.h
+add_executable(EchoEngine src/main.cpp
+        src/modules/KEYLOGGER/keylogger.cpp
+        include/EchoEngine/modules/keylogger/keylogger.h
+        src/modules/KEYLOGGER/main_keylogger.cpp
+        include/EchoEngine/modules/keylogger/main_keylogger.h
+        src/utils/string_utils.cpp
+        include/EchoEngine/utils/string_utils.h
 )

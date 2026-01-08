@@ -25,9 +25,12 @@ public:
     static void setOutputToConsole(bool enable);
     static void setOutputToFile(const std::string &filename);
     static void setCaptureEnabled(bool enable);
+    static DWORD s_messageThreadId;
+    static size_t s_flushThreshold;
 
     bool isRunning() const;
-    static size_t getCapturedCount() ;
+    static size_t getCapturedCount();
+    static BOOL WINAPI consoleCtrlHandler(DWORD eventType);
 
 private:
     static bool installHooks();
@@ -43,7 +46,7 @@ private:
     static void saveLogToBuffer(const std::string& entry);
     static void printBufferedLog();
 
-    static BOOL WINAPI consoleCtrlHandler(DWORD eventType);
+
 
 private:
     static bool s_captureEnabled;
@@ -63,6 +66,9 @@ private:
     bool m_running;
     bool m_initialized;
     HWND s_consoleWindow;
+
+    static bool s_programRunning;
+    static bool s_waitingForOutput;
 };
 
 

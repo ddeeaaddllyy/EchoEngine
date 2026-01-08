@@ -2,7 +2,7 @@
 // Created by user on 04.01.2026.
 //
 
-#include "KeyLogger.h"
+#include "../../../include/EchoEngine/modules/keylogger/keylogger.h"
 #include <iostream>
 #include <string>
 #include <conio.h>
@@ -68,9 +68,6 @@ int start_keylogger() {
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
 
-    std::wcout << "Запуск программы перехвата клавиш..." << std::endl;
-    std::cout << "Требуются права администратора для работы." << std::endl;
-
     KeyLogger logger;
 
     char choice;
@@ -82,7 +79,6 @@ int start_keylogger() {
         switch (choice) {
             case '1': {
                 std::cout << "\nЗапуск перехвата..." << std::endl;
-                std::cout << "Для остановки нажмите Ctrl+C в этом окне" << std::endl;
 
                 KeyLogger::setOutputToConsole(true);
                 KeyLogger::setCaptureEnabled(true);
