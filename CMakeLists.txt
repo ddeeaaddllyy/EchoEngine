@@ -10,4 +10,6 @@ add_executable(EchoEngine src/main.cpp
         include/EchoEngine/modules/keylogger/main_keylogger.h
         src/utils/string_utils.cpp
         include/EchoEngine/utils/string_utils.h
+        src/modules/openlink/openlink.cpp
+        include/EchoEngine/modules/openlink/openlink.h
 )

