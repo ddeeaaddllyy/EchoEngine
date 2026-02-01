@@ -11,4 +11,5 @@ add_executable(EchoEngine src/MainActivity.cpp
         src/core/RuleEngine.h
         src/storage/SnapshotStorage.cpp
         src/core/Integrity.cpp
+        src/model/FileInfo.h
 )

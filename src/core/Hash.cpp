@@ -1,7 +1,6 @@
 #include <array>
 #include <fstream>
 #include <vector>
-#include <cstdint>
 #include <filesystem>
 
 std::array<uint8_t, 32> simple_hash(const std::vector<uint8_t>& data) {
@@ -19,7 +18,7 @@ std::array<uint8_t, 32> simple_hash(const std::vector<uint8_t>& data) {
 
 std::array<uint8_t, 32> hash_file(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
-    std::vector<uint8_t> data(
+    const std::vector<uint8_t> data(
         std::istreambuf_iterator<char>(file),
         {}
     );
