@@ -3,15 +3,10 @@
 #include <fstream>
 #include <unordered_map>
 #include <string>
+#include "model/FileInfo.h"
 
 namespace fs = std::filesystem;
 
-// ===== Тип данных =====
-struct FileInfo {
-    uintmax_t size;
-};
-
-// ===== Сканирование файлов =====
 std::unordered_map<std::string, FileInfo> scan_files(const fs::path& root) {
     std::unordered_map<std::string, FileInfo> result;
 
@@ -23,14 +18,13 @@ std::unordered_map<std::string, FileInfo> scan_files(const fs::path& root) {
             auto size = entry.file_size();
             result[entry.path().string()] = { size };
         } catch (...) {
-            // пропускаем файлы без доступа
+            // dont care
         }
     }
 
     return result;
 }
 
-// ===== Сохранение baseline =====
 void save_baseline(
     const std::unordered_map<std::string, FileInfo>& files,
     const std::string& file
@@ -40,11 +34,12 @@ void save_baseline(
         throw std::runtime_error("Cannot create baseline file");
 
     for (const auto& [path, info] : files) {
-        out << path << "|" << info.size << "\n";
+        out << path << " | " << info.size << "\n";
     }
+
+    out.close();
 }
 
-// ===== Загрузка baseline =====
 std::unordered_map<std::string, FileInfo> load_baseline(const std::string& file) {
     std::unordered_map<std::string, FileInfo> result;
     std::ifstream in(file);
@@ -54,20 +49,22 @@ std::unordered_map<std::string, FileInfo> load_baseline(const std::string& file)
 
     std::string line;
     while (std::getline(in, line)) {
-        auto sep = line.find('|');
+        const auto sep = line.find('|');
+
         if (sep == std::string::npos)
             continue;
 
         std::string path = line.substr(0, sep);
-        uintmax_t size = std::stoull(line.substr(sep + 1));
+        const uintmax_t size = std::stoull(line.substr(sep + 1));
 
         result[path] = { size };
     }
 
+    in.close();
+
     return result;
 }
 
-// ===== Проверка целостности =====
 void verify(
     const std::unordered_map<std::string, FileInfo>& baseline,
     const std::unordered_map<std::string, FileInfo>& current
@@ -83,17 +80,16 @@ void verify(
     }
 }
 
-// ===== main =====
 int main() {
     const std::string BASELINE_FILE = "baseline.txt";
     const fs::path SCAN_DIR = fs::current_path();
 
     try {
         if (!fs::exists(BASELINE_FILE)) {
-            std::cout << "[ANTI-CHEAT] Creating baseline...\n";
+            std::cout << "[WAIT] Creating baseline...\n";
             auto snap = scan_files(SCAN_DIR);
             save_baseline(snap, BASELINE_FILE);
-            std::cout << "[OK] Baseline created. Restart program.\n";
+            std::cout << "[+] Baseline created. Restart program.\n";
             return 0;
         }
 
